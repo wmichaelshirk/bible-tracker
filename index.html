@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Bible Tracker</title>
+</head>
+<body>
+  Test.
+  <script src="./node_modules/bible-passage-reference-parser/js/en_bcv_parser.min.js" charset="UTF-8"></script>
+  <script>
+      var bcv = new bcv_parser;
+
+      function verseToOSIS (vsNumber) {
+        let bookNum = 1
+        let chapter = 1
+        while (vsNumber - vssPerBook(bookFrom(bookNum)) >= 1) {
+          vsNumber -= vssPerBook(bookFrom(bookNum))
+          // console.log(`${bookFrom(bookNum)} : ${vssPerBook(bookFrom(bookNum))} - new total ${vsNumber}`)
+          bookNum += 1
+        }
+        let book = bookFrom(bookNum)
+        let chapters = vssPerChapter(book)
+        while (vsNumber - chapters[chapter-1] >= 1) {
+          vsNumber -= chapters[chapter-1]
+          chapter += 1
+        }
+        return {b: book, c: chapter, v: vsNumber}
+      }
+
+      function OSIStoVerse(osis) {
+        const prevBooks = bcv.translation_info("kjv")
+            .books
+            .indexOf(osis.b)
+        const prevChapters = osis.c
+        let total = 0;
+
+        for (let x = 1; x <= prevBooks; x++ ) {
+          total += vssPerBook(bookFrom(x));
+          // console.log(`${bookFrom(x)} : ${vssPerBook(bookFrom(x))} - new total ${total}`)
+        }
+        for (let x = 1; x < prevChapters; x++ ) {
+          total += vssPerChapter(osis.b)[x-1];
+        }
+        total += osis.v
+        return total
+      }
+
+      function bookFrom(bookNumber) {
+        return bcv.translation_info("kjv")
+            .books[bookNumber-1]
+      }
+
+      function vssPerBook (book) {
+        return vssPerChapter(book)
+            .reduce(sum)
+      }
+
+      function vssPerChapter (book) {
+        return bcv.translation_info("kjv")
+            .chapters[book]
+      }
+
+      function sum(a, b) {
+        return a + b
+      }
+      function reduceArray(func) {
+        return function (arr) {
+          return arr.reduce(func);
+        }
+      }
+  </script>
+</body>
+</html>
