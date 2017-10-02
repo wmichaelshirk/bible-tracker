@@ -3,19 +3,108 @@
 <head>
   <meta charset="UTF-8">
   <title>Bible Tracker</title>
+  <link rel="stylesheet" href="https://unpkg.com/blaze">
 </head>
 <body>
-  Test.
+  <main id="app" class="o-container o-container--medium">
+
+    <div class="c-progress u-large">
+      <div class="c-progress__bar c-progress__bar--info"
+          :style="{width: OTtotalPercent }">
+        {{ OTpercent }}
+      </div>
+      <div class="c-progress__bar c-progress__bar--error"
+          :style="{width: NTtotalPercent }">
+        {{ NTpercent }}
+      </div>
+      <div class="c-progress__bar c-progress__bar--warning"
+          v-if="useApocrypha"
+          :style="{width: ApTotalPercent }">
+        {{ ApPercent }}
+      </div>
+    </div>
+    <div class="u-center-block">
+      <div class="u-center-block__content u-center-block__content--horizontal">
+        {{ totalPercent }}
+      </div>
+    </div>
+
+    <div class="o-grid">
+      <div class="o-grid__cell">
+        <h2>Read</h2>
+        <ol class="c-list c-list--unstyled">
+          <li v-for="entry in lectionary">{{ entry }}</li>
+        </ol>
+      </div>
+      <div class="o-grid__cell">
+        <h2>Not Read</h2>
+        <ol class="c-list c-list--unstyled">
+          <li v-for="entry in reverseLectionary">
+              <a :href="entryToLink(entry)">{{ entryToLabel(entry) }}</a>
+          </li>
+        </ol>
+      </div>
+      <div class="o-grid__cell">
+        <h2>Coverage</h2>
+        <ul class="o-grid__cell">
+          <li v-for="(v, book) in coverage"
+            :class="{check: percent(v)==100}"
+            v-if="v.vss">{{book}}: {{ percent(v) }}%</li>
+        </ul>
+      </div>
+
+    </div>
+
+
+    <p>Paste your readings here.</p>
+    <p>Note that whole chapters are acceptable (i.e., 'Matt. 3'), but
+       partial chapters through whole chapters must be explicit (i.e.,
+       'Rev.11:15-12' will <b>not</b> work, you must use 'Rev. 11:15-12:17').</p>
+    <p>Also note: the Song of the Three Children, for now, should be entered
+       as Prayer of Azariah. 3 and 4 Macchabees, and the body (not the additions)
+       of Greek Esther are ignored.</p>
+    <textarea class="c-field" name="Verses" id="verses" cols="50" rows="10">
+    </textarea>
+    <button class="c-button" onclick="parseLectionary()">Submit</button>
+    <button class="c-button" @click="clear">Clear</button>
+    <label class="c-field c-field--choice">
+      <input type="checkbox" v-model="useApocrypha">Count Apocrypha
+    </label>
+
+  </main>
   <script src="./node_modules/bible-passage-reference-parser/js/en_bcv_parser.min.js" charset="UTF-8"></script>
   <script>
-      var bcv = new bcv_parser;
 
-      function verseToOSIS (vsNumber) {
+      const bcv = new bcv_parser;
+      bcv.include_apocrypha(true);
+
+      let vsList;
+
+
+
+      const bookList = bcv.translation_info("kjv")
+          .books
+          .filter(b=>b!='SgThree')
+          .filter(b=>b!="3Macc")
+          .filter(b=>b!="4Macc");
+
+      const chapterList = bcv.translation_info("kjv").chapters
+      chapterList['GkEsth'] = chapterList['GkEsth'].slice(9) // remove English Esther... :-/
+      chapterList['Ps'] = chapterList['Ps'].slice(0,150) // remove Psalm 151...
+
+      const versesInBibleWithApocrypha =
+          bookList.map(b=>vssPerBook(b))
+          .reduce(sum);
+      const versesInBibleWithoutApocrypha =
+          bookList.slice(0,66).map(b=>vssPerBook(b))
+          .reduce(sum);
+
+      function verseToBCV (vsNumber) {
+        let originalVs = vsNumber
         let bookNum = 1
         let chapter = 1
         while (vsNumber - vssPerBook(bookFrom(bookNum)) >= 1) {
           vsNumber -= vssPerBook(bookFrom(bookNum))
-          // console.log(`${bookFrom(bookNum)} : ${vssPerBook(bookFrom(bookNum))} - new total ${vsNumber}`)
           bookNum += 1
         }
         let book = bookFrom(bookNum)
@@ -27,37 +116,32 @@
         return {b: book, c: chapter, v: vsNumber}
       }
 
-      function OSIStoVerse(osis) {
-        const prevBooks = bcv.translation_info("kjv")
-            .books
-            .indexOf(osis.b)
-        const prevChapters = osis.c
+      function BCVtoVerse(obj) {
+        const prevBooks = bookList.indexOf(obj.b)
+        const prevChapters = obj.c
         let total = 0;
 
         for (let x = 1; x <= prevBooks; x++ ) {
           total += vssPerBook(bookFrom(x));
-          // console.log(`${bookFrom(x)} : ${vssPerBook(bookFrom(x))} - new total ${total}`)
         }
         for (let x = 1; x < prevChapters; x++ ) {
-          total += vssPerChapter(osis.b)[x-1];
+          total += vssPerChapter(obj.b)[x-1];
         }
-        total += osis.v
+        total += obj.v
         return total
       }
 
       function bookFrom(bookNumber) {
-        return bcv.translation_info("kjv")
-            .books[bookNumber-1]
+        return bookList[bookNumber-1]
       }
 
       function vssPerBook (book) {
         return vssPerChapter(book)
-            .reduce(sum)
+            .reduce(sum);
       }
 
       function vssPerChapter (book) {
-        return bcv.translation_info("kjv")
-            .chapters[book]
+        return chapterList[book]
       }
 
       function sum(a, b) {
@@ -68,6 +152,161 @@
           return arr.reduce(func);
         }
       }
+
+    let bookCoverage = bookList.reduce(
+      (acc, el)=>{acc[el]={vss:0, total: vssPerBook(el)}; return acc}, {}
+    );
+    let lectionary = [];
+    let reverseLectionary = [];
+
+    function parseLectionary() {
+      let startTime = new Date();
+      let submission = document.getElementById('verses').value;
+      let parsedResults = bcv.parse(submission).parsed_entities()
+      console.log('building array...')
+      vsList = new Array(versesInBibleWithApocrypha);
+
+      parsedResults[0].entities.forEach(function(reading) {
+
+        let start = BCVtoVerse(reading.start);
+        let end = BCVtoVerse(reading.end);
+        console.log(`Adding “${reading.osis}”: vss ${start} - ${end}`)
+
+        for (let x = start; x <= end; x++) {
+          vsList[x] = (vsList[x] || 0) + 1
+        }
+      })
+
+      console.log('building Lectionary:')
+      let last = 1;
+
+      for (let x = 1; x <= versesInBibleWithApocrypha; x++) {
+        if (vsList[x]) {
+          bookCoverage[verseToBCV(x).b].vss += 1;
+        }
+        if (xor(vsList[x], vsList[x-1]) || x==versesInBibleWithApocrypha) {
+          if (vsList[x] || x==versesInBibleWithApocrypha) {
+            let li = document.createElement('li')
+            let start = verseToBCV(last);
+            let end = verseToBCV(x-1);
+            reverseLectionary
+              .push({start, end})
+              console.log(start, end)
+            last = x;
+          } else {
+            let li = document.createElement('li')
+            let start = verseToBCV(last);
+            let end = verseToBCV(x-1);
+            lectionary
+              .push(`${start.b} ${start.c}:${start.v} - ${end.b} ${end.c}:${end.v}`)
+            last = x;
+          }
+
+        }
+      }
+      let totalTime = new Date() - startTime;
+      console.log(`Total time: ${totalTime / 1000} seconds.`)
+
+    }
+
+    function xor(a, b) {
+      return ((a || b ) && !(a && b));
+    }
+  </script>
+  <script src="https://npmcdn.com/vue/dist/vue.js"></script>
+  <script>
+    new Vue({
+      el: '#app',
+      data() {
+        return {
+          coverage: bookCoverage,
+          lectionary,
+          reverseLectionary,
+          useApocrypha: true
+        }
+      },
+      methods: {
+        vssPerBook,
+        clear() {
+          lectionary = []
+          this.lectionary=lectionary;
+          reverseLectionary = []
+          this.reverseLectionary=reverseLectionary
+          bookCoverage = bookList.reduce(
+           (acc, el)=>{acc[el]={vss:0, total: vssPerBook(el)}; return acc}, {}
+          );
+          this.coverage = bookCoverage
+          document.getElementById('verses').value = ""
+        },
+        percent(v) {
+          return parseFloat(((v.vss / v.total) * 100).toFixed(2))
+      },
+      entryToLink({start, end}) {
+          return `https://www.biblegateway.com/passage/?search=${start.b}+${start.c}%3A${start.v}+-+${end.b}+${end.c}%3A${end.v}&version=KJV`
+      },
+      entryToLabel({start, end}) {
+        return `${start.b} ${start.c}:${start.v} - ${end.b} ${end.c}:${end.v}`
+      }
+      },
+      computed: {
+        maxVss() {
+          return this.useApocrypha ? versesInBibleWithApocrypha : versesInBibleWithoutApocrypha
+        },
+        OTcoverage() {
+          return bookList.filter((b,i)=>i<39)
+              .map(b=>this.coverage[b].vss)
+              .reduce(sum);
+        },
+        OTpercent() {
+          return Math.round((this.OTcoverage / 23152) * 100) +'%'
+        },
+        OTtotalPercent() {
+          return parseFloat(((this.OTcoverage / this.maxVss) * 100).toFixed(2)) + '%';
+        },
+        NTcoverage() {
+          return bookList.filter((b,i) => i >= 39 && i < 66)
+              .map(b=>this.coverage[b].vss)
+              .reduce(sum);
+        },
+        NTpercent() {
+          return Math.round((this.NTcoverage / 7958) * 100) +'%'
+        },
+        NTtotalPercent() {
+          return parseFloat(((this.NTcoverage / this.maxVss) * 100).toFixed(2)) + '%';
+        },
+        ApCoverage() {
+          return bookList.filter((b,i) => i >= 66)
+              .map(b=>this.coverage[b].vss)
+              .reduce(sum);
+        },
+        ApPercent() {
+          return Math.round((this.ApCoverage / 6648) * 100) +'%'
+        },
+        ApTotalPercent() {
+          return parseFloat(((this.ApCoverage / this.maxVss) * 100).toFixed(2)) + '%';
+        },
+        totalCoverage() {
+          return bookList
+              .filter((b,i)=> this.useApocrypha ? true : i < 66)
+              .map(b=>this.coverage[b].vss)
+              .reduce(sum)
+        },
+        totalPercent() {
+          return parseFloat(((this.totalCoverage / this.maxVss) * 100).toFixed(2)) + '%';
+      }
+      }
+    })
   </script>
 </body>
+<style>
+.check {
+  list-style-type: none;
+  /*text-decoration: line-through;*/
+  margin-left: -18px;
+  font-weight: bold;
+}
+.check::before {
+  content: '\2713\0020'
+}
+</style>
 </html>
