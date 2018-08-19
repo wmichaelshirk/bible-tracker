@@ -3,21 +3,36 @@
 <head>
   <meta charset="UTF-8">
   <title>Bible Tracker</title>
-  <link rel="stylesheet" href="https://unpkg.com/blaze">
+  <link rel="stylesheet" href="https://unpkg.com/blaze-css/dist/blaze.min.css">
 </head>
 <body>
   <main id="app" class="o-container o-container--medium">
 
-    <div class="c-progress u-large">
-      <div class="c-progress__bar c-progress__bar--info"
+    <div class="c-progress">
+      <div role="progressbar"
+          :aria-valuenow="OTpercent"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          :aria-valuetext="OTpercent"
+          class="c-progress__bar c-progress__bar--info"
           :style="{width: OTtotalPercent }">
         {{ OTpercent }}
       </div>
-      <div class="c-progress__bar c-progress__bar--error"
+      <div role="progressbar"
+          :aria-valuenow="NTpercent"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          :aria-valuetext="NTpercent"
+          class="c-progress__bar c-progress__bar--error"
           :style="{width: NTtotalPercent }">
         {{ NTpercent }}
       </div>
-      <div class="c-progress__bar c-progress__bar--warning"
+      <div role="progressbar"
+          :aria-valuenow="ApPercent"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          :aria-valuetext="ApPercent" 
+          class="c-progress__bar c-progress__bar--warning"
           v-if="useApocrypha"
           :style="{width: ApTotalPercent }">
         {{ ApPercent }}
@@ -72,7 +87,8 @@
     </label>
 
   </main>
-  <script src="./node_modules/bible-passage-reference-parser/js/en_bcv_parser.min.js" charset="UTF-8"></script>
+  <script src="https://unpkg.com/bible-passage-reference-parser/js/en_bcv_parser.min.js" charset="UTF-8"></script>
+  <!-- <script src="./node_modules/bible-passage-reference-parser/js/en_bcv_parser.min.js" charset="UTF-8"></script> -->
   <script>
 
       const bcv = new bcv_parser;
@@ -163,21 +179,21 @@
       let startTime = new Date();
       let submission = document.getElementById('verses').value;
       let parsedResults = bcv.parse(submission).parsed_entities()
-      console.log('building array...')
+      // console.log('building array...')
       vsList = new Array(versesInBibleWithApocrypha);
 
       parsedResults[0].entities.forEach(function(reading) {
 
         let start = BCVtoVerse(reading.start);
         let end = BCVtoVerse(reading.end);
-        console.log(`Adding “${reading.osis}”: vss ${start} - ${end}`)
+        // console.log(`Adding “${reading.osis}”: vss ${start} - ${end}`)
 
         for (let x = start; x <= end; x++) {
           vsList[x] = (vsList[x] || 0) + 1
         }
       })
 
-      console.log('building Lectionary:')
+      // console.log('building Lectionary:')
       let last = 1;
 
       for (let x = 1; x <= versesInBibleWithApocrypha; x++) {
@@ -191,7 +207,7 @@
             let end = verseToBCV(x-1);
             reverseLectionary
               .push({start, end})
-              console.log(start, end)
+              // console.log(start, end)
             last = x;
           } else {
             let li = document.createElement('li')
@@ -205,7 +221,7 @@
         }
       }
       let totalTime = new Date() - startTime;
-      console.log(`Total time: ${totalTime / 1000} seconds.`)
+      // console.log(`Total time: ${totalTime / 1000} seconds.`)
 
     }
 
