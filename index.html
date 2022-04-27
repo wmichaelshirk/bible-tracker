@@ -3,46 +3,50 @@
 <head>
   <meta charset="UTF-8">
   <title>Bible Tracker</title>
-  <link rel="stylesheet" href="https://unpkg.com/blaze-css/dist/blaze.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/@blaze/css@10.0.4/dist/blaze/blaze.css">
+  <script type="module" src="https://unpkg.com/@blaze/atoms@x.x.x/dist/blaze-atoms/blaze-atoms.esm.js"></script>
+  <script nomodule="" src="https://unpkg.com/@blaze/atoms@x.x.x/dist/blaze-atoms/blaze-atoms.js"></script>
 </head>
 <body>
   <main id="app" class="o-container o-container--medium">
 
-    <div class="c-progress">
-      <div role="progressbar"
-          :aria-valuenow="OTpercent"
-          aria-valuemin="0"
-          aria-valuemax="100"
-          :aria-valuetext="OTpercent"
-          class="c-progress__bar c-progress__bar--info"
-          :style="{width: OTtotalPercent }">
+    <blaze-progress rounded size="large">
+      <blaze-progress-bar min="0" :value="OTpercent" max="100" type="info">
         {{ OTpercent }}
-      </div>
-      <div role="progressbar"
-          :aria-valuenow="NTpercent"
-          aria-valuemin="0"
-          aria-valuemax="100"
-          :aria-valuetext="NTpercent"
-          class="c-progress__bar c-progress__bar--error"
-          :style="{width: NTtotalPercent }">
-        {{ NTpercent }}
-      </div>
-      <div role="progressbar"
-          :aria-valuenow="ApPercent"
-          aria-valuemin="0"
-          aria-valuemax="100"
-          :aria-valuetext="ApPercent" 
-          class="c-progress__bar c-progress__bar--warning"
-          v-if="useApocrypha"
-          :style="{width: ApTotalPercent }">
+      </blaze-progress-bar>
+      <blaze-progress-bar min="0" :value="ApPercent" max="100" type="warning"
+        v-if="useApocrypha"
+      >
         {{ ApPercent }}
-      </div>
-    </div>
+      </blaze-progress-bar>
+      <blaze-progress-bar min="0" :value="NTpercent" max="100" type="error">
+        {{ NTpercent }}
+      </blaze-progress-bar>
+    </blaze-progress>
     <div class="u-center-block">
       <div class="u-center-block__content u-center-block__content--horizontal">
         {{ totalPercent }}
       </div>
     </div>
+
+
+    <p class="c-paragraph">Paste your readings here.</p>
+    <p class="c-paragraph">Note that whole chapters are acceptable (i.e., 'Matt. 3'), but
+       partial chapters through whole chapters must be explicit (i.e.,
+       'Rev.11:15-12' will <b>not</b> work, you must use 'Rev. 11:15-12:17').</p>
+    <p class="c-paragraph">Also note: the Song of the Three Children, for now, should be entered
+       as 'PrAzar'. 3 and 4 Macchabees, and the body (not the additions)
+       of Greek Esther are ignored.</p>
+    <textarea class="c-field" name="Verses" id="verses" cols="50" rows="10">
+    </textarea>
+    
+    <button class="c-button" @click="parseLectionary">Submit</button>
+
+    <button class="c-button" @click="clear">Clear</button>
+    
+    <label class="c-field c-field--choice">
+      <input type="checkbox" v-model="useApocrypha"> Count Apocrypha
+    </label>
 
     <div class="o-grid">
       <div class="o-grid__cell">
@@ -62,29 +66,15 @@
       <div class="o-grid__cell">
         <h2>Coverage</h2>
         <ul class="o-grid__cell">
-          <li v-for="(v, book) in coverage"
-            :class="{check: percent(v)==100}"
-            v-if="v.vss">{{book}}: {{ percent(v) }}%</li>
+          <template v-for="(v, book) in coverage">
+            <li :class="{check: percent(v)==100}"
+             v-if="v.vss">
+              {{book}}: {{ percent(v) }}%</li>
+          </template>
         </ul>
       </div>
 
     </div>
-
-
-    <p>Paste your readings here.</p>
-    <p>Note that whole chapters are acceptable (i.e., 'Matt. 3'), but
-       partial chapters through whole chapters must be explicit (i.e.,
-       'Rev.11:15-12' will <b>not</b> work, you must use 'Rev. 11:15-12:17').</p>
-    <p>Also note: the Song of the Three Children, for now, should be entered
-       as Prayer of Azariah. 3 and 4 Macchabees, and the body (not the additions)
-       of Greek Esther are ignored.</p>
-    <textarea class="c-field" name="Verses" id="verses" cols="50" rows="10">
-    </textarea>
-    <button class="c-button" onclick="parseLectionary()">Submit</button>
-    <button class="c-button" @click="clear">Clear</button>
-    <label class="c-field c-field--choice">
-      <input type="checkbox" v-model="useApocrypha">Count Apocrypha
-    </label>
 
   </main>
   <script src="https://unpkg.com/bible-passage-reference-parser/js/en_bcv_parser.min.js" charset="UTF-8"></script>
@@ -95,8 +85,6 @@
       bcv.include_apocrypha(true);
 
       let vsList;
-
-
 
       const bookList = bcv.translation_info("kjv")
           .books
@@ -193,7 +181,7 @@
         }
       })
 
-      // console.log('building Lectionary:')
+      console.log('building Lectionary:')
       let last = 1;
 
       for (let x = 1; x <= versesInBibleWithApocrypha; x++) {
@@ -221,18 +209,17 @@
         }
       }
       let totalTime = new Date() - startTime;
-      // console.log(`Total time: ${totalTime / 1000} seconds.`)
-
+      console.log(`Total time: ${totalTime / 1000} seconds.`)
+      return bookCoverage
     }
 
     function xor(a, b) {
       return ((a || b ) && !(a && b));
     }
   </script>
-  <script src="https://npmcdn.com/vue/dist/vue.js"></script>
+  <script src="https://unpkg.com/vue@3"></script>
   <script>
-    new Vue({
-      el: '#app',
+    Vue.createApp({
       data() {
         return {
           coverage: bookCoverage,
@@ -254,15 +241,20 @@
           this.coverage = bookCoverage
           document.getElementById('verses').value = ""
         },
+        parseLectionary() {
+          this.coverage = {...parseLectionary()}
+          this.lectionary = [...lectionary]
+          this.reverseLectionary = [...reverseLectionary]
+        }, 
         percent(v) {
           return parseFloat(((v.vss / v.total) * 100).toFixed(2))
-      },
-      entryToLink({start, end}) {
-          return `https://www.biblegateway.com/passage/?search=${start.b}+${start.c}%3A${start.v}+-+${end.b}+${end.c}%3A${end.v}&version=KJV`
-      },
-      entryToLabel({start, end}) {
-        return `${start.b} ${start.c}:${start.v} - ${end.b} ${end.c}:${end.v}`
-      }
+        },
+        entryToLink({start, end}) {
+            return `https://www.biblegateway.com/passage/?search=${start.b}+${start.c}%3A${start.v}+-+${end.b}+${end.c}%3A${end.v}&version=KJV`
+        },
+        entryToLabel({start, end}) {
+          return `${start.b} ${start.c}:${start.v} - ${end.b} ${end.c}:${end.v}`
+        }
       },
       computed: {
         maxVss() {
@@ -311,18 +303,18 @@
           return parseFloat(((this.totalCoverage / this.maxVss) * 100).toFixed(2)) + '%';
       }
       }
-    })
+    }).mount('#app')
   </script>
 </body>
 <style>
-.check {
-  list-style-type: none;
-  /*text-decoration: line-through;*/
-  margin-left: -18px;
-  font-weight: bold;
-}
-.check::before {
-  content: '\2713\0020'
+  .check {
+    list-style-type: none;
+    /*text-decoration: line-through;*/
+    margin-left: -18px;
+    font-weight: bold;
+  }
+  .check::before {
+    content: '\2713\0020'
 }
 </style>
 </html>
